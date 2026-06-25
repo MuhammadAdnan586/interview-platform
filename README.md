@@ -189,13 +189,3 @@ Key endpoints:
 
 ---
 
-## Suggested CV / portfolio framing
-
-> "Built a multi-tenant SaaS interview-readiness platform: FastAPI + SQLite
-> backend with JWT auth, CV parsing (PyMuPDF + custom NER-free skill matching),
-> LLM-based question generation (local Ollama, with deterministic fallback),
-> speech-to-text and prosodic confidence analysis (faster-whisper + librosa),
-> semantic answer scoring (sentence-transformers with a TF-IDF fallback), and
-> PDF report generation (reportlab). Designed scoring to be transparent and
-> explainable rather than a black-box decision, with configurable per-company
-> weighting and graceful degradation when optional ML components aren't installed."
