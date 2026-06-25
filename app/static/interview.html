@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interview — Interview Readiness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/styles.css">
+<style>
+  .progress-track { height: 5px; background: var(--panel-soft); border-radius: 100px; overflow: hidden; margin-bottom: 24px; }
+  .progress-fill { height: 100%; background: var(--amber); transition: width 0.3s; }
+  .question-type-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--teal); text-transform: uppercase;
+    letter-spacing: 0.05em; background: var(--teal-soft); padding: 3px 9px; border-radius: 100px; display: inline-block; margin-bottom: 12px;
+  }
+  .question-text { font-family: 'Space Grotesk', sans-serif; font-size: 21px; font-weight: 600; line-height: 1.4; margin-bottom: 24px; }
+  .record-area { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 30px 0; }
+  .mic-btn {
+    width: 72px; height: 72px; border-radius: 50%; background: var(--amber); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 26px; transition: transform 0.15s;
+  }
+  .mic-btn.recording { background: var(--danger); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(217,112,107,0.5); } 50% { box-shadow: 0 0 0 14px rgba(217,112,107,0); } }
+  .timer { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+  .mode-toggle { font-size: 12.5px; color: var(--teal); cursor: pointer; text-align: center; margin-top: 6px; }
+  .answer-feedback { background: var(--panel-soft); border-radius: var(--radius-sm); padding: 14px; margin-top: 16px; font-size: 13px; }
+  .answer-feedback .transcript { color: var(--text-dim); font-style: italic; margin-bottom: 8px; }
+  .answer-feedback .scores span { color: var(--amber); font-family: 'JetBrains Mono', monospace; margin-right: 14px; }
+  .nav-buttons { display: flex; gap: 10px; margin-top: 20px; }
+  .webcam-setup { text-align: center; }
+  video#webcamPreview { width: 100%; max-width: 320px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin: 14px 0; background: #000; }
+</style>
+</head>
+<body>
+  <div class="topnav">
+    <div class="brand"><span class="dot"></span> Interview Readiness</div>
+    <div class="nav-right"><span id="progressText"></span></div>
+  </div>
+
+  <div class="wrap" style="max-width: 680px;">
+    <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+
+    <div id="loadingState" class="empty-state">Loading interview…</div>
+
+    <div id="questionView" style="display:none;">
+      <div class="panel">
+        <div class="question-type-badge" id="questionType"></div>
+        <div class="question-text" id="questionText"></div>
+
+        <div class="record-area" id="recordArea">
+          <button class="mic-btn" id="micBtn">🎤</button>
+          <div class="timer" id="timer">Tap to record your answer</div>
+        </div>
+        <div class="mode-toggle" id="typeToggle">or type your answer instead</div>
+
+        <textarea id="typedAnswer" placeholder="Type your answer here…" style="display:none;"></textarea>
+
+        <div id="answerFeedback" class="answer-feedback" style="display:none;"></div>
+
+        <div class="error-box" id="answerError" style="display:none;"></div>
+
+        <div class="nav-buttons">
+          <button class="btn-primary" id="submitBtn">Submit answer</button>
+          <button class="btn-secondary" id="nextBtn" style="display:none;">Next question &rarr;</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="webcamView" class="panel webcam-setup" style="display:none;">
+      <h2>Optional: body language check-in</h2>
+      <p class="empty-state">Record a short 8-second clip looking at the camera, like you would during a real video interview. This is completely optional and only adds supportive feedback — never a score that blocks anything.</p>
+      <video id="webcamPreview" autoplay muted></video>
+      <div>
+        <button class="btn-secondary" id="skipWebcamBtn">Skip this step</button>
+        <button class="btn-primary" id="recordWebcamBtn">Start 8s recording</button>
+      </div>
+      <div class="muted-note" id="webcamNote"></div>
+    </div>
+
+    <div id="finishingView" class="panel" style="display:none; text-align:center;">
+      <div class="spinner" style="width:24px;height:24px;"></div>
+      <p style="margin-top:14px;">Calculating your readiness report…</p>
+    </div>
+  </div>
+
+<script src="/static/js/api.js"></script>
+<script>
+  if (!Auth.requireRole('candidate')) { /* redirected */ }
+
+  const params = new URLSearchParams(window.location.search);
+  const attemptId = params.get('attempt_id');
+  if (!attemptId) window.location.href = '/candidate';
+
+  let questions = [];
+  let currentIndex = 0;
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let recordedBlob = null;
+  let isTypedMode = false;
+  let timerInterval = null;
+  let seconds = 0;
+
+  const questionView = document.getElementById('questionView');
+  const loadingState = document.getElementById('loadingState');
+  const questionType = document.getElementById('questionType');
+  const questionText = document.getElementById('questionText');
+  const micBtn = document.getElementById('micBtn');
+  const timerEl = document.getElementById('timer');
+  const typeToggle = document.getElementById('typeToggle');
+  const typedAnswer = document.getElementById('typedAnswer');
+  const submitBtn = document.getElementById('submitBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const answerFeedback = document.getElementById('answerFeedback');
+  const answerError = document.getElementById('answerError');
+  const progressFill = document.getElementById('progressFill');
+  const progressText = document.getElementById('progressText');
+
+  async function loadInterview() {
+    try {
+      const data = await apiFetch(`/api/interview/${attemptId}`);
+      questions = data.questions;
+      loadingState.style.display = 'none';
+      questionView.style.display = 'block';
+      showQuestion(0);
+    } catch (err) {
+      loadingState.textContent = err.message;
+    }
+  }
+
+  function showQuestion(idx) {
+    currentIndex = idx;
+    const q = questions[idx];
+    questionType.textContent = q.type;
+    questionText.textContent = q.question;
+    progressFill.style.width = `${((idx) / questions.length) * 100}%`;
+    progressText.textContent = `Question ${idx + 1} of ${questions.length}`;
+    resetAnswerUI();
+  }
+
+  function resetAnswerUI() {
+    recordedBlob = null;
+    typedAnswer.value = '';
+    typedAnswer.style.display = 'none';
+    document.getElementById('recordArea').style.display = 'flex';
+    typeToggle.textContent = 'or type your answer instead';
+    isTypedMode = false;
+    answerFeedback.style.display = 'none';
+    hideError(answerError);
+    submitBtn.style.display = 'inline-flex';
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit answer';
+    nextBtn.style.display = 'none';
+    timerEl.textContent = 'Tap to record your answer';
+    micBtn.classList.remove('recording');
+  }
+
+  typeToggle.addEventListener('click', () => {
+    isTypedMode = !isTypedMode;
+    typedAnswer.style.display = isTypedMode ? 'block' : 'none';
+    document.getElementById('recordArea').style.display = isTypedMode ? 'none' : 'flex';
+    typeToggle.textContent = isTypedMode ? 'or record your answer instead' : 'or type your answer instead';
+  });
+
+  micBtn.addEventListener('click', async () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunks = [];
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        stream.getTracks().forEach(t => t.stop());
+        clearInterval(timerInterval);
+        timerEl.textContent = `Recorded ${seconds}s — tap to re-record`;
+        micBtn.classList.remove('recording');
+      };
+      mediaRecorder.start();
+      micBtn.classList.add('recording');
+      seconds = 0;
+      timerEl.textContent = '0s';
+      timerInterval = setInterval(() => { seconds++; timerEl.textContent = `${seconds}s — tap to stop`; }, 1000);
+    } catch (err) {
+      showError(answerError, 'Microphone access denied or unavailable. Try typing your answer instead.');
+    }
+  });
+
+  submitBtn.addEventListener('click', async () => {
+    hideError(answerError);
+    if (isTypedMode && !typedAnswer.value.trim()) {
+      showError(answerError, 'Please type an answer first.'); return;
+    }
+    if (!isTypedMode && !recordedBlob) {
+      showError(answerError, 'Please record an answer, or switch to typing.'); return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner"></span> Scoring…';
+
+    const formData = new FormData();
+    formData.append('question_index', currentIndex);
+    if (isTypedMode) {
+      formData.append('transcript', typedAnswer.value.trim());
+    } else {
+      formData.append('audio', recordedBlob, 'answer.webm');
+    }
+
+    try {
+      const result = await apiFetch(`/api/interview/${attemptId}/answer`, { method: 'POST', body: formData });
+      answerFeedback.style.display = 'block';
+      answerFeedback.innerHTML = `
+        <div class="transcript">"${result.transcript || '(no speech detected — try typing instead)'}"</div>
+        <div class="scores">
+          <span>Relevance: ${result.relevance_score}%</span>
+          <span>Clarity: ${result.clarity_score}%</span>
+          ${result.confidence_score !== null ? `<span>Voice confidence: ${result.confidence_score}%</span>` : ''}
+        </div>`;
+      submitBtn.style.display = 'none';
+      nextBtn.style.display = 'inline-flex';
+      nextBtn.textContent = currentIndex < questions.length - 1 ? 'Next question →' : 'Finish interview';
+    } catch (err) {
+      showError(answerError, err.message);
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit answer';
+    }
+  });
+
+  nextBtn.addEventListener('click', () => {
+    if (currentIndex < questions.length - 1) {
+      showQuestion(currentIndex + 1);
+    } else {
+      progressFill.style.width = '100%';
+      showWebcamStep();
+    }
+  });
+
+  // ---------- Optional webcam step ----------
+  function showWebcamStep() {
+    questionView.style.display = 'none';
+    document.getElementById('webcamView').style.display = 'block';
+  }
+
+  document.getElementById('skipWebcamBtn').addEventListener('click', finishInterview);
+
+  document.getElementById('recordWebcamBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('recordWebcamBtn');
+    const note = document.getElementById('webcamNote');
+    const preview = document.getElementById('webcamPreview');
+    btn.disabled = true;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      preview.srcObject = stream;
+      const chunks = [];
+      const recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = e => chunks.push(e.data);
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        note.textContent = 'Uploading clip…';
+        const formData = new FormData();
+        formData.append('video', blob, 'clip.webm');
+        try {
+          const result = await apiFetch(`/api/interview/${attemptId}/body-language`, { method: 'POST', body: formData });
+          note.textContent = result.available ? 'Got it — analysis included in your report.' : result.message;
+        } catch (err) {
+          note.textContent = 'Skipped — ' + err.message;
+        }
+        setTimeout(finishInterview, 800);
+      };
+
+      recorder.start();
+      note.textContent = 'Recording…';
+      setTimeout(() => recorder.stop(), 8000);
+    } catch (err) {
+      note.textContent = 'Webcam unavailable — skipping this step.';
+      setTimeout(finishInterview, 800);
+    }
+  });
+
+  async function finishInterview() {
+    document.getElementById('webcamView').style.display = 'none';
+    document.getElementById('finishingView').style.display = 'block';
+    try {
+      await apiFetch(`/api/interview/${attemptId}/complete`, { method: 'POST' });
+      window.location.href = `/report?attempt_id=${attemptId}`;
+    } catch (err) {
+      document.getElementById('finishingView').innerHTML = `<div class="error-box" style="display:block;">${err.message}</div>`;
+    }
+  }
+
+  loadInterview();
+</script>
+</body>
+</html>

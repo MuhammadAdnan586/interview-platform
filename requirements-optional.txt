@@ -1,0 +1,20 @@
+# Optional add-ons. Install with:
+#   pip install -r requirements-optional.txt
+#
+# The app works fully without these — typed answers are still scored for
+# relevance and clarity. These add: real voice transcription, voice tone
+# analysis, stronger semantic scoring, and body language analysis.
+
+# Speech-to-text + voice confidence analysis (Phase 3)
+faster-whisper==1.0.3
+librosa==0.10.2
+soundfile==0.12.1
+
+# Stronger semantic answer-relevance scoring (Phase 3)
+# Without this, relevance scoring automatically falls back to TF-IDF.
+sentence-transformers==3.1.1
+
+# Body language analysis (Phase 4) — also requires two model files,
+# see README "Phase 4 setup" for the download links.
+mediapipe==0.10.33
+opencv-python==4.10.0.84

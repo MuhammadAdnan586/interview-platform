@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — Interview Readiness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/styles.css">
+<style>
+  .section-tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+  .section-tab {
+    padding: 9px 16px; border-radius: 100px; font-size: 13.5px; font-weight: 500; cursor: pointer;
+    background: var(--panel); border: 1px solid var(--border); color: var(--text-dim);
+  }
+  .section-tab.active { background: var(--amber-soft); border-color: rgba(217,164,65,0.4); color: var(--amber); }
+  .section { display: none; }
+  .section.active { display: block; }
+  .question-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); gap: 12px; }
+  .question-row:last-child { border-bottom: none; }
+  .question-row .q-text { font-size: 13.5px; flex: 1; }
+  .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-row .toggle-label { font-size: 14px; }
+  .toggle-row .toggle-desc { font-size: 12.5px; color: var(--text-dim); margin-top: 2px; }
+  .switch { position: relative; width: 42px; height: 24px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; cursor: pointer; inset: 0; background: var(--panel-soft); border: 1px solid var(--border); border-radius: 100px; transition: 0.2s; }
+  .slider:before { content: ""; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px; background: var(--text-dim); border-radius: 50%; transition: 0.2s; }
+  input:checked + .slider { background: var(--amber-soft); border-color: rgba(217,164,65,0.4); }
+  input:checked + .slider:before { transform: translateX(18px); background: var(--amber); }
+  .weight-row { display: grid; grid-template-columns: 1fr 90px; gap: 12px; align-items: center; padding: 8px 0; }
+  .weight-row input { margin-bottom: 0; }
+  .weight-sum-note { font-size: 12.5px; margin-top: 8px; }
+  .candidate-score { font-family: 'JetBrains Mono', monospace; color: var(--amber); }
+</style>
+</head>
+<body>
+  <div class="topnav">
+    <div class="brand"><span class="dot"></span> Interview Readiness</div>
+    <div class="nav-right"><span>Hi, <b id="userName"></b></span> <a href="#" onclick="Auth.logout()">Log out</a></div>
+  </div>
+
+  <div class="wrap">
+    <div class="eyebrow">Company admin</div>
+    <h1 class="page-title">Manage your interview pipeline</h1>
+    <p class="page-subtitle">Add custom questions, choose which rounds candidates go through, and compare results.</p>
+
+    <div class="section-tabs">
+      <div class="section-tab active" data-section="questions">Custom Questions</div>
+      <div class="section-tab" data-section="settings">Round Settings</div>
+      <div class="section-tab" data-section="weights">Scoring Weights</div>
+      <div class="section-tab" data-section="candidates">Candidates</div>
+    </div>
+
+    <!-- Custom Questions -->
+    <div class="section active" id="section-questions">
+      <div class="panel">
+        <h2>Add a custom question</h2>
+        <textarea id="newQuestionText" placeholder="e.g. Why do you want to work at our company specifically?"></textarea>
+        <button class="btn-primary" id="addQuestionBtn">Add question</button>
+        <div class="error-box" id="questionsError" style="display:none;"></div>
+        <div class="divider"></div>
+        <div id="questionsList"><div class="empty-state">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- Round Settings -->
+    <div class="section" id="section-settings">
+      <div class="panel">
+        <h2>Which rounds should candidates go through?</h2>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Self-introduction</div><div class="toggle-desc">A standard opening question, asked of every candidate.</div></div>
+          <label class="switch"><input type="checkbox" id="toggle-intro"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Technical round</div><div class="toggle-desc">Questions generated from the candidate's own CV skills.</div></div>
+          <label class="switch"><input type="checkbox" id="toggle-technical"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Custom questions</div><div class="toggle-desc">The questions you added in the "Custom Questions" tab.</div></div>
+          <label class="switch"><input type="checkbox" id="toggle-custom"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Awareness round</div><div class="toggle-desc">An industry-opinion question — not trivia, just how they think about the field.</div></div>
+          <label class="switch"><input type="checkbox" id="toggle-awareness"><span class="slider"></span></label>
+        </div>
+        <div class="success-box" id="settingsSaved" style="display:none;">Saved.</div>
+      </div>
+    </div>
+
+    <!-- Scoring Weights -->
+    <div class="section" id="section-weights">
+      <div class="panel">
+        <h2>Scoring weights</h2>
+        <p class="empty-state" style="margin-bottom:16px;">How much each category counts toward the overall readiness score. If a category isn't assessed for a candidate (e.g. body language wasn't recorded), its weight is automatically redistributed — no one is penalized for a module not being set up.</p>
+        <div class="weight-row"><label>Technical</label><input type="number" id="weight-technical" min="0" max="100"></div>
+        <div class="weight-row"><label>Communication</label><input type="number" id="weight-communication" min="0" max="100"></div>
+        <div class="weight-row"><label>Confidence (voice)</label><input type="number" id="weight-confidence" min="0" max="100"></div>
+        <div class="weight-row"><label>Body language</label><input type="number" id="weight-body_language" min="0" max="100"></div>
+        <div class="weight-row"><label>Custom questions</label><input type="number" id="weight-custom" min="0" max="100"></div>
+        <div class="weight-row"><label>Awareness</label><input type="number" id="weight-awareness" min="0" max="100"></div>
+        <div class="weight-sum-note" id="weightSumNote"></div>
+        <button class="btn-primary" id="saveWeightsBtn" style="margin-top:14px;">Save weights</button>
+        <div class="success-box" id="weightsSaved" style="display:none;">Saved.</div>
+      </div>
+    </div>
+
+    <!-- Candidates -->
+    <div class="section" id="section-candidates">
+      <div class="panel">
+        <h2>Candidate results</h2>
+        <div id="candidatesTable"><div class="empty-state">Loading…</div></div>
+      </div>
+    </div>
+  </div>
+
+<script src="/static/js/api.js"></script>
+<script>
+  if (Auth.requireRole('company')) {
+    document.getElementById('userName').textContent = Auth.getName();
+  }
+
+  // ---------- Section tabs ----------
+  document.querySelectorAll('.section-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(`section-${tab.dataset.section}`).classList.add('active');
+    });
+  });
+
+  // ---------- Custom Questions ----------
+  async function loadQuestions() {
+    const list = document.getElementById('questionsList');
+    try {
+      const questions = await apiFetch('/api/admin/questions');
+      list.innerHTML = questions.length === 0
+        ? '<div class="empty-state">No custom questions yet.</div>'
+        : questions.map(q => `
+            <div class="question-row">
+              <div class="q-text">${q.question_text}</div>
+              <button class="btn-danger" onclick="deleteQuestion(${q.id})">Delete</button>
+            </div>`).join('');
+    } catch (err) {
+      list.innerHTML = `<div class="error-box" style="display:block;">${err.message}</div>`;
+    }
+  }
+
+  document.getElementById('addQuestionBtn').addEventListener('click', async () => {
+    const text = document.getElementById('newQuestionText').value.trim();
+    const errBox = document.getElementById('questionsError');
+    hideError(errBox);
+    if (!text) { showError(errBox, 'Please type a question first.'); return; }
+    try {
+      await apiFetch('/api/admin/questions', { method: 'POST', body: { question_text: text } });
+      document.getElementById('newQuestionText').value = '';
+      loadQuestions();
+    } catch (err) {
+      showError(errBox, err.message);
+    }
+  });
+
+  async function deleteQuestion(id) {
+    try {
+      await apiFetch(`/api/admin/questions/${id}`, { method: 'DELETE' });
+      loadQuestions();
+    } catch (err) { alert(err.message); }
+  }
+
+  // ---------- Round Settings + Weights ----------
+  async function loadSettings() {
+    try {
+      const data = await apiFetch('/api/admin/settings');
+      document.getElementById('toggle-intro').checked = data.rounds.intro_enabled;
+      document.getElementById('toggle-technical').checked = data.rounds.technical_enabled;
+      document.getElementById('toggle-custom').checked = data.rounds.custom_enabled;
+      document.getElementById('toggle-awareness').checked = data.rounds.awareness_enabled;
+
+      document.getElementById('weight-technical').value = data.weights.technical;
+      document.getElementById('weight-communication').value = data.weights.communication;
+      document.getElementById('weight-confidence').value = data.weights.confidence;
+      document.getElementById('weight-body_language').value = data.weights.body_language;
+      document.getElementById('weight-custom').value = data.weights.custom;
+      document.getElementById('weight-awareness').value = data.weights.awareness;
+      updateWeightSum();
+    } catch (err) { console.error(err); }
+  }
+
+  ['intro','technical','custom','awareness'].forEach(key => {
+    document.getElementById(`toggle-${key}`).addEventListener('change', async (e) => {
+      try {
+        await apiFetch('/api/admin/settings/rounds', { method: 'PATCH', body: { [`${key}_enabled`]: e.target.checked } });
+        const saved = document.getElementById('settingsSaved');
+        saved.style.display = 'block';
+        setTimeout(() => saved.style.display = 'none', 1500);
+      } catch (err) { alert(err.message); }
+    });
+  });
+
+  function updateWeightSum() {
+    const ids = ['technical','communication','confidence','body_language','custom','awareness'];
+    const sum = ids.reduce((s, id) => s + (parseFloat(document.getElementById(`weight-${id}`).value) || 0), 0);
+    const note = document.getElementById('weightSumNote');
+    note.textContent = `Total: ${sum}% ${sum === 100 ? '' : '(weights are auto-normalized, so this doesn\'t need to be exactly 100)'}`;
+    note.style.color = sum === 100 ? 'var(--teal)' : 'var(--text-dim)';
+  }
+
+  document.querySelectorAll('#section-weights input').forEach(inp => inp.addEventListener('input', updateWeightSum));
+
+  document.getElementById('saveWeightsBtn').addEventListener('click', async () => {
+    const ids = ['technical','communication','confidence','body_language','custom','awareness'];
+    const payload = {};
+    ids.forEach(id => payload[`weight_${id}`] = parseFloat(document.getElementById(`weight-${id}`).value) || 0);
+    try {
+      await apiFetch('/api/admin/settings/weights', { method: 'PATCH', body: payload });
+      const saved = document.getElementById('weightsSaved');
+      saved.style.display = 'block';
+      setTimeout(() => saved.style.display = 'none', 1500);
+    } catch (err) { alert(err.message); }
+  });
+
+  // ---------- Candidates ----------
+  async function loadCandidates() {
+    const el = document.getElementById('candidatesTable');
+    try {
+      const candidates = await apiFetch('/api/admin/candidates');
+      if (candidates.length === 0) {
+        el.innerHTML = '<div class="empty-state">No completed interviews yet.</div>';
+        return;
+      }
+      el.innerHTML = `<table>
+        <thead><tr><th>Candidate</th><th>Overall</th><th>Date</th><th></th></tr></thead>
+        <tbody>
+          ${candidates.map(c => `
+            <tr>
+              <td>${c.candidate_name}<br><span class="empty-state" style="font-size:11.5px;">${c.candidate_email}</span></td>
+              <td class="candidate-score">${c.overall_score !== null ? c.overall_score.toFixed(0) + '%' : '—'}</td>
+              <td>${new Date(c.created_at).toLocaleDateString()}</td>
+              <td><a href="/report?attempt_id=${c.attempt_id}">View report &rarr;</a></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+    } catch (err) {
+      el.innerHTML = `<div class="error-box" style="display:block;">${err.message}</div>`;
+    }
+  }
+
+  loadQuestions();
+  loadSettings();
+  loadCandidates();
+</script>
+</body>
+</html>

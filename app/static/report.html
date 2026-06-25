@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Readiness Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/styles.css">
+<style>
+  .overall-card { text-align: center; padding: 36px 24px; }
+  .overall-score { font-family: 'Space Grotesk', sans-serif; font-size: 56px; font-weight: 700; color: var(--amber); line-height: 1; }
+  .overall-label { font-size: 13px; color: var(--text-dim); margin-top: 6px; }
+  .disclaimer { font-size: 12.5px; color: var(--text-dim); max-width: 440px; margin: 14px auto 0; line-height: 1.5; }
+  .qa-item { padding: 16px 0; border-bottom: 1px solid var(--border); }
+  .qa-item:last-child { border-bottom: none; }
+  .qa-item .q-type { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--teal); text-transform: uppercase; }
+  .qa-item .q-text { font-weight: 600; margin: 4px 0 6px; }
+  .qa-item .a-text { color: var(--text-dim); font-size: 13.5px; font-style: italic; margin-bottom: 6px; }
+  .qa-item .a-scores span { color: var(--amber); font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-right: 12px; }
+</style>
+</head>
+<body>
+  <div class="topnav">
+    <div class="brand"><span class="dot"></span> Interview Readiness</div>
+    <div class="nav-right"><a id="backLink" href="/candidate">&larr; Dashboard</a></div>
+  </div>
+
+  <div class="wrap" style="max-width: 760px;">
+    <div id="loadingState" class="empty-state">Loading report…</div>
+
+    <div id="reportView" style="display:none;">
+      <div class="panel overall-card">
+        <div class="eyebrow">Readiness Report</div>
+        <div class="overall-score" id="overallScore">—</div>
+        <div class="overall-label">Overall Readiness</div>
+        <p class="disclaimer">This is a multi-dimensional readiness signal, not a hire/reject decision — the final call always belongs to a human reviewer.</p>
+        <button class="btn-primary" id="downloadBtn" style="margin-top:18px;">Download PDF report</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="panel">
+        <h2>Score breakdown</h2>
+        <div id="scoreBreakdown"></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="panel">
+        <h2>Question-by-question detail</h2>
+        <div id="qaList"></div>
+      </div>
+    </div>
+  </div>
+
+<script src="/static/js/api.js"></script>
+<script>
+  if (!Auth.isLoggedIn()) { window.location.href = '/login'; }
+  document.getElementById('backLink').href = Auth.getRole() === 'company' ? '/admin' : '/candidate';
+
+  const params = new URLSearchParams(window.location.search);
+  const attemptId = params.get('attempt_id');
+
+  async function loadReport() {
+    try {
+      const data = await apiFetch(`/api/interview/${attemptId}`);
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('reportView').style.display = 'block';
+
+      document.getElementById('overallScore').textContent =
+        data.overall_score !== null ? `${data.overall_score.toFixed(0)}%` : 'N/A';
+
+      renderScoreBars(document.getElementById('scoreBreakdown'), data.score_breakdown || {});
+
+      const qaList = document.getElementById('qaList');
+      const answersByIndex = {};
+      (data.answers || []).forEach(a => answersByIndex[a.question_index] = a);
+
+      qaList.innerHTML = data.questions.map((q, i) => {
+        const a = answersByIndex[i];
+        return `<div class="qa-item">
+          <div class="q-type">${q.type}</div>
+          <div class="q-text">${i + 1}. ${q.question}</div>
+          <div class="a-text">${a ? '"' + (a.transcript || '(no answer)') + '"' : '(not answered)'}</div>
+          ${a ? `<div class="a-scores">
+            <span>Relevance: ${a.relevance_score}%</span>
+            <span>Clarity: ${a.clarity_score}%</span>
+            ${a.confidence_score !== null ? `<span>Confidence: ${a.confidence_score}%</span>` : ''}
+          </div>` : ''}
+        </div>`;
+      }).join('');
+    } catch (err) {
+      document.getElementById('loadingState').textContent = err.message;
+    }
+  }
+
+  document.getElementById('downloadBtn').addEventListener('click', () => {
+    const token = Auth.getToken();
+    fetch(`/api/report/${attemptId}/pdf`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => res.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'Interview_Readiness_Report.pdf';
+        document.body.appendChild(a); a.click(); a.remove();
+      });
+  });
+
+  loadReport();
+</script>
+</body>
+</html>

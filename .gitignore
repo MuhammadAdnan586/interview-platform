@@ -1,0 +1,14 @@
+﻿venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.local
+*.egg-info/
+.pytest_cache/
+node_modules/
+dist/
+build/
+
+interview_platform.db

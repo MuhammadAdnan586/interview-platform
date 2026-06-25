@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Interview Readiness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/styles.css">
+<style>
+  .dropzone {
+    border: 1.5px dashed var(--border); border-radius: var(--radius); padding: 32px 20px;
+    text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  }
+  .dropzone:hover, .dropzone.drag { border-color: var(--teal); background: var(--teal-soft); }
+  .dropzone .main-label { font-size: 14px; color: var(--text); margin-bottom: 4px; }
+  .dropzone .sub-label { font-size: 12px; color: var(--text-dim); }
+  input[type="file"] { display: none; }
+  .file-chip { margin-top: 12px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: var(--text-dim); display: none; }
+  .category-block { margin-bottom: 14px; }
+  .category-block h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); font-weight: 500; margin: 0 0 8px; }
+  .attempt-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+  .attempt-row:last-child { border-bottom: none; }
+  .attempt-row .status-badge { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 8px; border-radius: 100px; }
+  .status-completed { background: var(--teal-soft); color: var(--teal); }
+  .status-in_progress { background: var(--amber-soft); color: var(--amber); }
+</style>
+</head>
+<body>
+  <div class="topnav">
+    <div class="brand"><span class="dot"></span> Interview Readiness</div>
+    <div class="nav-right"><span>Hi, <b id="userName"></b></span> <a href="#" onclick="Auth.logout()">Log out</a></div>
+  </div>
+
+  <div class="wrap">
+    <div class="eyebrow">Candidate dashboard</div>
+    <h1 class="page-title">Start a new interview</h1>
+    <p class="page-subtitle">Upload your CV, optionally pick a company to practice for, and start when you're ready.</p>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h2>1. Upload your CV</h2>
+        <div class="dropzone" id="dropzone">
+          <div class="main-label">Click to choose a PDF, or drag it here</div>
+          <div class="sub-label">Only .pdf resumes are supported</div>
+        </div>
+        <input type="file" id="fileInput" accept="application/pdf">
+        <div class="file-chip" id="fileChip"></div>
+        <div id="cvError" class="error-box" style="display:none;"></div>
+
+        <div class="divider"></div>
+
+        <label>Interviewing for (optional)</label>
+        <select id="companySelect">
+          <option value="">Generic practice interview</option>
+        </select>
+
+        <button class="btn-primary btn-block" id="startBtn" disabled>Analyze CV &amp; continue</button>
+        <div class="muted-note" id="generationModeNote"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Extracted profile</h2>
+        <div id="profileResults"><div class="empty-state">Upload a CV to see detected skills here.</div></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="panel">
+      <h2>Your past attempts</h2>
+      <div id="attemptsList"><div class="empty-state">Loading…</div></div>
+    </div>
+  </div>
+
+<script src="/static/js/api.js"></script>
+<script>
+  if (Auth.requireRole('candidate')) {
+    document.getElementById('userName').textContent = Auth.getName();
+  }
+
+  let cvProfile = null;
+
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const fileChip = document.getElementById('fileChip');
+  const cvError = document.getElementById('cvError');
+  const startBtn = document.getElementById('startBtn');
+  const profileResults = document.getElementById('profileResults');
+  const companySelect = document.getElementById('companySelect');
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault(); dropzone.classList.remove('drag');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+  async function handleFile(file) {
+    fileChip.style.display = 'block';
+    fileChip.textContent = '> ' + file.name + ' (' + Math.round(file.size / 1024) + ' KB) — analyzing…';
+    hideError(cvError);
+    startBtn.disabled = true;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const profile = await apiFetch('/api/cv/analyze', { method: 'POST', body: formData });
+      cvProfile = profile;
+      fileChip.textContent = '> ' + file.name + ' — analyzed';
+      renderProfile(profile);
+      startBtn.disabled = false;
+    } catch (err) {
+      showError(cvError, err.message);
+      fileChip.style.display = 'none';
+    }
+  }
+
+  function renderProfile(profile) {
+    let html = `<div class="muted-note" style="margin-bottom:14px;">
+      Email: <b>${profile.email || '—'}</b> &nbsp;|&nbsp;
+      Phone: <b>${profile.phone || '—'}</b> &nbsp;|&nbsp;
+      Experience: <b>${profile.experience_years ? profile.experience_years + ' yrs' : 'not stated'}</b>
+    </div>`;
+    const categories = Object.keys(profile.skills_by_category || {});
+    if (categories.length === 0) {
+      html += '<div class="empty-state">No known skills detected — interview will use general questions.</div>';
+    } else {
+      categories.forEach(cat => {
+        html += `<div class="category-block"><h4>${cat}</h4><div class="chips">`;
+        profile.skills_by_category[cat].forEach(s => html += `<span class="chip">${s}</span>`);
+        html += `</div></div>`;
+      });
+    }
+    profileResults.innerHTML = html;
+  }
+
+  async function loadCompanies() {
+    try {
+      const companies = await apiFetch('/api/companies');
+      companies.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.name;
+        companySelect.appendChild(opt);
+      });
+    } catch (err) { /* non-critical */ }
+  }
+
+  async function loadAttempts() {
+    const el = document.getElementById('attemptsList');
+    try {
+      const attempts = await apiFetch('/api/interview');
+      if (attempts.length === 0) {
+        el.innerHTML = '<div class="empty-state">No interviews yet — start your first one above.</div>';
+        return;
+      }
+      el.innerHTML = attempts.map(a => `
+        <div class="attempt-row">
+          <span>${a.company_name} &nbsp; <span class="mono" style="color:var(--text-dim);">${new Date(a.created_at).toLocaleDateString()}</span></span>
+          <span>
+            ${a.overall_score !== null ? `<b>${a.overall_score.toFixed(0)}%</b>` : ''}
+            <span class="status-badge status-${a.status}">${a.status.replace('_',' ')}</span>
+            ${a.status === 'completed' ? `<a href="/report?attempt_id=${a.attempt_id}" style="margin-left:10px;">View report &rarr;</a>` : ''}
+          </span>
+        </div>
+      `).join('');
+    } catch (err) {
+      el.innerHTML = `<div class="error-box" style="display:block;">${err.message}</div>`;
+    }
+  }
+
+  startBtn.addEventListener('click', async () => {
+    startBtn.disabled = true;
+    startBtn.innerHTML = '<span class="spinner"></span> Starting…';
+    try {
+      const payload = { company_id: companySelect.value ? parseInt(companySelect.value) : null, cv_profile: cvProfile };
+      const result = await apiFetch('/api/interview/start', { method: 'POST', body: payload });
+      window.location.href = `/interview?attempt_id=${result.attempt_id}`;
+    } catch (err) {
+      showError(cvError, err.message);
+      startBtn.disabled = false;
+      startBtn.textContent = 'Analyze CV & continue';
+    }
+  });
+
+  loadCompanies();
+  loadAttempts();
+</script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log in — Interview Readiness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/styles.css">
+<style>
+  .auth-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; }
+  .back-link { font-size: 13px; color: var(--text-dim); margin-bottom: 18px; display: inline-block; }
+</style>
+</head>
+<body>
+  <div class="wrap-narrow">
+    <a href="/" class="back-link">&larr; Back home</a>
+    <div class="eyebrow" id="roleEyebrow">Candidate account</div>
+    <h1 class="page-title" style="font-size:24px;">Welcome</h1>
+
+    <div class="tabs" style="margin-top:20px;">
+      <div class="tab" data-role="candidate">Candidate</div>
+      <div class="tab" data-role="company">Company</div>
+    </div>
+
+    <div class="auth-card">
+      <div class="tabs">
+        <div class="tab" data-mode="login">Log in</div>
+        <div class="tab" data-mode="signup">Sign up</div>
+      </div>
+
+      <form id="authForm">
+        <div id="nameField" style="display:none;">
+          <label id="nameLabel">Full name</label>
+          <input type="text" id="name" placeholder="Jane Doe">
+        </div>
+        <label>Email</label>
+        <input type="email" id="email" placeholder="you@example.com" required>
+        <label>Password</label>
+        <input type="password" id="password" placeholder="••••••••" required>
+        <button type="submit" class="btn-primary btn-block" id="submitBtn">Log in</button>
+        <div class="error-box" id="errorBox" style="display:none;"></div>
+      </form>
+    </div>
+    <p class="muted-note" style="text-align:center;margin-top:16px;">Demo project — don't reuse a real password here.</p>
+  </div>
+
+<script src="/static/js/api.js"></script>
+<script>
+  let currentRole = "candidate";
+  let currentMode = "login";
+
+  const roleTabs = document.querySelectorAll('.tabs')[0].querySelectorAll('.tab');
+  const modeTabs = document.querySelectorAll('.tabs')[1].querySelectorAll('.tab');
+  const nameField = document.getElementById('nameField');
+  const nameInput = document.getElementById('name');
+  const nameLabel = document.getElementById('nameLabel');
+  const submitBtn = document.getElementById('submitBtn');
+  const roleEyebrow = document.getElementById('roleEyebrow');
+  const errorBox = document.getElementById('errorBox');
+
+  function paramAs() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('as');
+  }
+
+  function setRole(role) {
+    currentRole = role;
+    roleTabs.forEach(t => t.classList.toggle('active', t.dataset.role === role));
+    roleEyebrow.textContent = role === 'company' ? 'Company account' : 'Candidate account';
+    nameLabel.textContent = role === 'company' ? 'Company name' : 'Full name';
+    render();
+  }
+
+  function setMode(mode) {
+    currentMode = mode;
+    modeTabs.forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+    render();
+  }
+
+  function render() {
+    nameField.style.display = currentMode === 'signup' ? 'block' : 'none';
+    submitBtn.textContent = currentMode === 'signup' ? 'Create account' : 'Log in';
+    hideError(errorBox);
+  }
+
+  roleTabs.forEach(t => t.addEventListener('click', () => setRole(t.dataset.role)));
+  modeTabs.forEach(t => t.addEventListener('click', () => setMode(t.dataset.mode)));
+
+  setRole(paramAs() === 'company' ? 'company' : 'candidate');
+  setMode('login');
+
+  document.getElementById('authForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideError(errorBox);
+    submitBtn.disabled = true;
+
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const name = nameInput.value.trim();
+
+    try {
+      let data;
+      if (currentMode === 'signup') {
+        if (!name) throw new Error(currentRole === 'company' ? 'Company name is required.' : 'Name is required.');
+        const url = currentRole === 'company' ? '/api/auth/signup/company' : '/api/auth/signup/candidate';
+        data = await apiFetch(url, { method: 'POST', body: { name, email, password } });
+      } else {
+        data = await apiFetch('/api/auth/login', { method: 'POST', body: { email, password } });
+      }
+      Auth.setSession(data.access_token, data.role, data.name);
+      window.location.href = data.role === 'company' ? '/admin' : '/candidate';
+    } catch (err) {
+      showError(errorBox, err.message);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
