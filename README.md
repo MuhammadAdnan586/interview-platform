@@ -61,27 +61,27 @@ Every "smart" feature (LLM question generation, real voice transcription, semant
   <tr>
     <td align="center" width="50%">
       <b>🏠 Candidate Dashboard</b><br/><br/>
-      <img src="https://raw.githubusercontent.com/MuhammadAdnan586/interview-platform/main/screenshots/dashboard.png" width="400" alt="Dashboard"/>
+      <img src="https://raw.githubusercontent.com/MuhammadAdnan586/interview-platform/main/WhatsApp%20Image%202026-06-25%20at%204.36.48%20PM.jpeg" width="400" alt="Dashboard"/>
     </td>
     <td align="center" width="50%">
       <b>📄 CV Upload & Analysis</b><br/><br/>
-      <img src="https://raw.githubusercontent.com/MuhammadAdnan586/interview-platform/main/screenshots/cv_upload.png" width="400" alt="CV Upload"/>
+      <img src="https://raw.githubusercontent.com/MuhammadAdnan586/interview-platform/main/WhatsApp%20Image%202026-06-25%20at%204.36.48%20PM%20(1).jpeg" width="400" alt="CV Upload"/>
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
       <b>🎤 Live Interview — Voice & Typed</b><br/><br/>
-      <img src="https://raw.githubusercontent.com/MuhammadAdnan586/interview-platform/main/screenshots/interview.png" width="400" alt="Interview"/>
+      <img src="https://raw.githubusercontent.com/MuhammadAdnan586/interview-platform/main/WhatsApp%20Image%202026-06-25%20at%204.36.49%20PM.jpeg" width="400" alt="Interview"/>
     </td>
     <td align="center" width="50%">
       <b>📊 Scoring & Results</b><br/><br/>
-      <img src="https://raw.githubusercontent.com/MuhammadAdnan586/interview-platform/main/screenshots/results.png" width="400" alt="Results"/>
+      <img src="https://raw.githubusercontent.com/MuhammadAdnan586/interview-platform/main/WhatsApp%20Image%202026-06-25%20at%204.36.49%20PM%20(1).jpeg" width="400" alt="Results"/>
     </td>
   </tr>
   <tr>
     <td align="center" colspan="2">
       <b>📋 PDF Readiness Report</b><br/><br/>
-      <img src="https://raw.githubusercontent.com/MuhammadAdnan586/interview-platform/main/screenshots/report.png" width="400" alt="Report"/>
+      <img src="https://raw.githubusercontent.com/MuhammadAdnan586/interview-platform/main/WhatsApp%20Image%202026-06-25%20at%204.36.49%20PM%20(2).jpeg" width="400" alt="Report"/>
     </td>
   </tr>
 </table>
