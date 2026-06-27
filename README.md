@@ -41,7 +41,7 @@ Every "smart" feature (LLM question generation, real voice transcription, semant
 - **Semantic Answer Scoring** — sentence-transformers for relevance detection
 - Typed answer fallback with TF-IDF scoring when voice is unavailable
 
-**🔹 Phase 4 — Body Language (Optional)**
+**🔹 Phase 4 — Body Language **
 - **Webcam Analysis** — posture and eye-contact feedback via MediaPipe
 - Descriptive signals only — never blocks or scores a candidate on appearance
 - Fully skippable — reports "not assessed" if module not installed
